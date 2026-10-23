@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: AutoParts AI & ERP Integrator API
+  version: 2.0.0
+  description: Assistente inteligente de autopeças integrado ao ERP com Function Calling e catálogo técnico desacoplado.
+paths:
+  /consultar-peca:
+    post:
+      summary: Consultar compatibilidade, estoque e preço de autopeça via linguagem natural
+      operationId: consultar_peca
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultaRequest'
+      responses:
+        '200':
+          description: Consulta processada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsultaResponse'
+        '422':
+          description: Erro de validação de payload (pergunta vazia, <3 ou >500 caracteres)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '502':
+          description: Erro de comunicação com o provedor de IA (Gemini)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '504':
+          description: Timeout ao aguardar resposta da API de IA (>15s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '500':
+          description: Erro interno de processamento ou falha no banco de dados SQLite
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+
+components:
+  schemas:
+    ConsultaRequest:
+      type: object
+      required:
+        - pergunta
+      properties:
+        pergunta:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: Pergunta em linguagem natural sobre autopeças e veículos.
+          example: Preciso do amortecedor dianteiro do Gol G5 2012 1.0, tem no estoque?
+
+    PecaERP:
+      type: object
+      required:
+        - sku
+        - nome_peca
+        - em_estoque
+      properties:
+        sku:
+          type: string
+          example: AMOR-G5-01
+        nome_peca:
+          type: string
+          example: Amortecedor Dianteiro Turbogas
+        em_estoque:
+          type: boolean
+          example: true
+        preco:
+          type: number
+          nullable: true
+          example: 250.0
+        quantidade:
+          type: integer
+          nullable: true
+          example: 12
+
+    ConsultaResponse:
+      type: object
+      required:
+        - status
+        - pecas_encontradas
+        - resposta
+      properties:
+        status:
+          type: string
+          example: sucesso
+        pecas_encontradas:
+          type: array
+          items:
+            $ref: '#/components/schemas/PecaERP'
+        resposta:
+          type: string
+          example: Sim! Temos o Amortecedor Dianteiro (SKU: AMOR-G5-01) por R$ 250,00 com 12 unidades em estoque.
+
+    ErrorDetail:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: Timeout ao aguardar resposta da API do Google Gemini.
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
